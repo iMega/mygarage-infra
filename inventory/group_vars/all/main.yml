@@ -8,7 +8,6 @@ timezone: UTC
 # --- access -----------------------------------------------------------------
 admin_user: ops
 admin_ssh_public_keys:
-  - "{{ lookup('file', playbook_dir + '/../ssh_keys/admin.pub') }}"
   - "{{ lookup('file', playbook_dir + '/../ssh_keys/ci-ansible.pub') }}"
 
 deploy_user: deploy
