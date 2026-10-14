@@ -12,7 +12,7 @@ cd "$(dirname "$0")/.."
 readonly NAME=mygarage-test
 readonly IMAGE=almalinux/9-init:9.6
 readonly STATE=test/.state
-readonly INVENTORY=inventory/test.yml
+readonly INVENTORY=test/inventory/test.yml
 
 # Nothing in the test bench is encrypted; the variable only satisfies
 # scripts/vault-pass.sh.

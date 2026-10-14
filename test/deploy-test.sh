@@ -166,14 +166,14 @@ pass "healthcheck ok"
 echo "== 10. unit change from Ansible restarts through blue/green"
 before=$(in_box 'cat /var/lib/mygarage-deploy/active')
 traffic_start
-ansible-playbook -i inventory/test.yml playbooks/site.yml --tags app \
+ansible-playbook -i test/inventory/test.yml playbooks/site.yml --tags app \
     -e mygarage_memory_max=300M >"$WORK/ansible.log" 2>&1 || fail "ansible: $(tail -20 "$WORK/ansible.log")"
 read -r total bad < <(traffic_stop)
 after=$(in_box 'cat /var/lib/mygarage-deploy/active')
 in_box 'systemctl show -p MemoryMax mygarage@'"$after" | grep -q '=314572800' || fail "new unit not applied"
 [[ $before != "$after" && $(proxy_sha) == "$sha_b" ]] || fail "no blue/green restart ($before -> $after)"
 ((bad == 0)) || fail "requests during restart: $bad of $total failed"
-ansible-playbook -i inventory/test.yml playbooks/site.yml --tags app >/dev/null 2>&1 || fail "ansible revert"
+ansible-playbook -i test/inventory/test.yml playbooks/site.yml --tags app >/dev/null 2>&1 || fail "ansible revert"
 pass "unit change applied via $before -> $after, $total requests, $bad failed"
 
 in_box '/opt/mygarage/bin/status.sh'

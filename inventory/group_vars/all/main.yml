@@ -8,12 +8,17 @@ timezone: UTC
 # --- access -----------------------------------------------------------------
 admin_user: ops
 admin_ssh_public_keys:
+  - "{{ lookup('file', playbook_dir + '/../ssh_keys/admin.pub') }}"
   - "{{ lookup('file', playbook_dir + '/../ssh_keys/ci-ansible.pub') }}"
 
 deploy_user: deploy
 deploy_ssh_public_key: "{{ lookup('file', playbook_dir + '/../ssh_keys/deploy.pub') }}"
 
 ssh_port: 22
+# Temporary: root and password logins stay enabled until manual access is no
+# longer needed; set both to false to allow keys only.
+ssh_permit_root_login: true
+ssh_password_authentication: true
 
 # --- system -----------------------------------------------------------------
 base_upgrade_packages: false

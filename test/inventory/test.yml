@@ -1,6 +1,7 @@
 ---
 # Local test bench: AlmaLinux 9 container with systemd (see test/run.sh).
-# Same group and group_vars as production; only host-specific overrides.
+# group_vars/all/main.yml links to the production one; the encrypted
+# vault.yml is left out, its variables are defined here.
 all:
   children:
     mygarage:
