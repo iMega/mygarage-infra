@@ -1,0 +1,72 @@
+---
+name: provision
+
+# The repository is the source of truth: every push to main that touches the
+# configuration is validated and applied to the server.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "test/**"
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Apply changes (unchecked = --check --diff dry run)
+        type: boolean
+        default: true
+      tags:
+        description: Limit to role tags, e.g. "proxy,app" (empty = all)
+        type: string
+        default: ""
+
+# Never two Ansible runs against the server at once; a newer push waits
+# for the running one and supersedes older pending runs.
+concurrency:
+  group: production-server
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    uses: ./.github/workflows/validate.yml
+
+  # Off until the bootstrap workflow has created the admin user: before
+  # that every run would fail to log in.
+  provision:
+    needs: validate
+    if: vars.PROVISION_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/ansible
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          ssh-key: ${{ secrets.ANSIBLE_SSH_KEY }}
+          known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+
+      - name: Run site.yml
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+          APPLY: ${{ github.event_name == 'push' || inputs.apply }}
+          TAGS: ${{ inputs.tags }}
+        run: |
+          args=(--diff)
+          [[ $APPLY == true ]] || args+=(--check)
+          if [[ -n $TAGS ]]; then
+            [[ $TAGS =~ ^[a-z,]+$ ]] || { echo "invalid tags: $TAGS"; exit 1; }
+            args+=(--tags "$TAGS")
+          fi
+          ansible-playbook playbooks/site.yml "${args[@]}"
+
+      # A new SSH connection (no multiplexed master left from the run) with
+      # sudo proves that sshd, firewalld and the admin keys still let us in.
+      - name: Verify SSH access
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+          ANSIBLE_SSH_ARGS: -o ControlMaster=no -o ControlPath=none
+        run: ansible mygarage -b -m ansible.builtin.command -a true

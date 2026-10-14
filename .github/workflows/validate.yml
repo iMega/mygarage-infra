@@ -1,0 +1,46 @@
+---
+name: validate
+
+# Pushes to main are validated by provision.yml before it applies them.
+on:
+  push:
+    branches-ignore: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    # Linting never decrypts the vault (its password lives only in the
+    # production environment); scripts/vault-pass.sh just needs a value.
+    env:
+      ANSIBLE_VAULT_PASSWORD: unused
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install tools
+        run: pip install ansible-core==2.21.5 ansible-lint yamllint
+
+      - name: Install collections
+        run: ansible-galaxy collection install -r requirements.yml -p .collections
+
+      - name: yamllint
+        run: yamllint .
+
+      - name: ansible-lint
+        run: ansible-lint
+
+      - name: Syntax check
+        run: |
+          ansible-playbook --syntax-check playbooks/bootstrap.yml
+          ansible-playbook --syntax-check playbooks/site.yml
+
+      - name: shellcheck
+        run: shellcheck -x roles/*/files/*.sh scripts/*.sh test/*.sh

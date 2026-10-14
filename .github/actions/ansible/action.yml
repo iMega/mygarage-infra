@@ -1,0 +1,50 @@
+---
+name: Set up Ansible
+description: Installs Ansible with the collections and the SSH credentials for the server.
+
+inputs:
+  host:
+    description: Server address (secret SERVER_HOST), exported as MYGARAGE_HOST for the inventory
+    required: true
+  ssh-key:
+    description: Private key of the ci-ansible user (ops)
+    required: true
+  known-hosts:
+    description: Host key line(s) of the server
+    required: true
+  sshpass:
+    description: Install sshpass for password logins (bootstrap as root)
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install Ansible
+      shell: bash
+      run: |
+        pip install ansible-core==2.21.5
+        ansible-galaxy collection install -r requirements.yml -p .collections
+
+    - name: Install sshpass
+      if: inputs.sshpass == 'true'
+      shell: bash
+      run: sudo apt-get install -y --no-install-recommends sshpass
+
+    - name: Configure SSH
+      shell: bash
+      env:
+        HOST: ${{ inputs.host }}
+        SSH_KEY: ${{ inputs.ssh-key }}
+        KNOWN_HOSTS: ${{ inputs.known-hosts }}
+      run: |
+        [[ -n $HOST && -n $SSH_KEY && -n $KNOWN_HOSTS ]] ||
+          { echo "::error::SERVER_HOST, ANSIBLE_SSH_KEY and SSH_KNOWN_HOSTS must be set"; exit 1; }
+        echo "MYGARAGE_HOST=$HOST" >> "$GITHUB_ENV"
+        install -m 700 -d ~/.ssh
+        printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+        printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts

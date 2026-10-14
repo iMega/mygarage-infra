@@ -1,0 +1,9 @@
+---
+collections:
+  - name: ansible.posix
+    version: ">=2.0.0,<3.0.0"
+  - name: community.general
+    version: ">=10.0.0,<12.0.0"
+  # Local test bench only (test/run.sh).
+  - name: community.docker
+    version: ">=4.0.0,<6.0.0"

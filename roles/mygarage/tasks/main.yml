@@ -1,0 +1,107 @@
+---
+- name: Create application user
+  ansible.builtin.user:
+    name: mygarage
+    system: true
+    shell: /sbin/nologin
+    home: "{{ mygarage_data_dir }}"
+    create_home: false
+
+- name: Create deploy user
+  ansible.builtin.user:
+    name: "{{ deploy_user }}"
+    shell: /bin/bash
+
+# restrict: no PTY or forwarding; scp/sftp and plain commands still work.
+- name: Install deploy SSH key
+  ansible.posix.authorized_key:
+    user: "{{ deploy_user }}"
+    key: "{{ deploy_ssh_public_key }}"
+    key_options: restrict
+    exclusive: true
+
+- name: Create application directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0755') }}"
+  loop:
+    - { path: "{{ mygarage_app_dir }}" }
+    - { path: "{{ mygarage_app_dir }}/bin" }
+    - { path: "{{ mygarage_app_dir }}/releases" }
+    - { path: "{{ mygarage_app_dir }}/slots" }
+    - path: "{{ mygarage_app_dir }}/incoming"
+      owner: "{{ deploy_user }}"
+      group: "{{ deploy_user }}"
+      mode: "0750"
+    - path: "{{ mygarage_data_dir }}"
+      owner: mygarage
+      group: mygarage
+      mode: "0750"
+    - { path: /etc/mygarage }
+    - { path: "{{ deploy_state_dir }}" }
+
+- name: Configure application environment
+  ansible.builtin.template:
+    src: common.env.j2
+    dest: /etc/mygarage/common.env
+    owner: root
+    group: mygarage
+    mode: "0640"
+  notify: Restart application
+
+- name: Configure slot ports
+  ansible.builtin.copy:
+    dest: /etc/mygarage/{{ item.key }}.env
+    content: |
+      # Managed by Ansible
+      MYGARAGE_PORT={{ item.value }}
+    owner: root
+    group: mygarage
+    mode: "0640"
+  loop: "{{ mygarage_slots | dict2items }}"
+  notify: Restart application
+
+- name: Configure deploy scripts
+  ansible.builtin.template:
+    src: deploy.env.j2
+    dest: /etc/mygarage/deploy.env
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install slot unit
+  ansible.builtin.template:
+    src: mygarage@.service.j2
+    dest: /etc/systemd/system/mygarage@.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart application
+
+- name: Install deploy scripts
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ mygarage_app_dir }}/bin/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - lib.sh
+    - deploy.sh
+    - rollback.sh
+    - status.sh
+    - restore.sh
+
+- name: Allow deploy user to run release scripts
+  ansible.builtin.template:
+    src: sudoers.j2
+    dest: /etc/sudoers.d/20-mygarage-deploy
+    owner: root
+    group: root
+    mode: "0440"
+    validate: visudo -cf %s

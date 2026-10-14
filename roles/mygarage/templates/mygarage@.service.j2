@@ -1,0 +1,44 @@
+# {{ ansible_managed }}
+# One instance per blue/green slot: mygarage@blue, mygarage@green.
+# /opt/mygarage/slots/%i is a symlink to the release, switched by deploy.sh.
+[Unit]
+Description=myGarage (%i slot)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=mygarage
+Group=mygarage
+EnvironmentFile=/etc/mygarage/common.env
+EnvironmentFile=/etc/mygarage/%i.env
+ExecStart={{ mygarage_app_dir }}/slots/%i/mygarage --daemon
+Restart=on-failure
+RestartSec=2s
+# The application drains requests for up to 25s on SIGTERM.
+TimeoutStopSec=35s
+KillMode=mixed
+
+# A release that outgrows its budget is killed inside its own cgroup
+# instead of triggering the global OOM killer.
+MemoryHigh={{ mygarage_memory_high }}
+MemoryMax={{ mygarage_memory_max }}
+OOMPolicy=stop
+
+UMask=0027
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+ReadWritePaths={{ mygarage_data_dir }}
+
+[Install]
+WantedBy=multi-user.target

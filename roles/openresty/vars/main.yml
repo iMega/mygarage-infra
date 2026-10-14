@@ -1,0 +1,6 @@
+---
+openresty_conf_dir: /usr/local/openresty/nginx/conf
+openresty_cert_dir: /etc/letsencrypt/live/{{ mygarage_domain }}
+openresty_tls: "{{ (mygarage_tls_enabled | bool) and (mygarage_domain | length > 0) }}"
+openresty_managed_sites:
+  - "{{ openresty_conf_dir }}/conf.d/mygarage.conf"

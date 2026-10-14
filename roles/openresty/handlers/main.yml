@@ -1,0 +1,11 @@
+---
+- name: Reload openresty
+  ansible.builtin.command:
+    cmd: "{{ openresty_bin }} -t"
+  changed_when: true
+  notify: Apply openresty reload
+
+- name: Apply openresty reload
+  ansible.builtin.systemd_service:
+    name: openresty
+    state: reloaded

@@ -1,0 +1,68 @@
+---
+# Desired state of the MyGarage server. Secrets live in vault.yml
+# (Ansible Vault); runtime state (active slot, release SHA) lives on the
+# server in /var/lib/mygarage-deploy and is never managed from here.
+
+timezone: UTC
+
+# --- access -----------------------------------------------------------------
+admin_user: ops
+admin_ssh_public_keys:
+  - "{{ lookup('file', playbook_dir + '/../ssh_keys/admin.pub') }}"
+  - "{{ lookup('file', playbook_dir + '/../ssh_keys/ci-ansible.pub') }}"
+
+deploy_user: deploy
+deploy_ssh_public_key: "{{ lookup('file', playbook_dir + '/../ssh_keys/deploy.pub') }}"
+
+ssh_port: 22
+
+# --- system -----------------------------------------------------------------
+base_upgrade_packages: false
+base_swap_enabled: true
+base_swap_size_mb: 1024
+base_swappiness: 10
+journald_max_use: 200M
+firewall_enabled: true
+
+# --- proxy ------------------------------------------------------------------
+# Empty domain serves plain HTTP on the IP address; set it together with a DNS
+# A record before enabling TLS.
+mygarage_domain: ""
+mygarage_tls_enabled: false
+proxy_check_port: 8080
+proxy_client_max_body_size: 20m
+htpasswd_users: "{{ vault_htpasswd_users }}"
+
+# --- application ------------------------------------------------------------
+mygarage_slots:
+  blue: 8081
+  green: 8082
+mygarage_data_dir: /var/lib/mygarage
+mygarage_app_dir: /opt/mygarage
+deploy_state_dir: /var/lib/mygarage-deploy
+openresty_bin: /usr/local/openresty/bin/openresty
+mygarage_memory_high: 200M
+mygarage_memory_max: 280M
+mygarage_gomemlimit: 160MiB
+
+deploy_min_mem_available_mb: 120
+deploy_ready_timeout: 60
+deploy_drain_seconds: 10
+deploy_releases_keep: 5
+
+# --- backup -----------------------------------------------------------------
+backup_dir: /var/backups/mygarage
+backup_on_calendar: "*-*-* 03:30:00"
+backup_keep_days: 14
+backup_min_free_mb: 1024
+# POST /backup/create on the active slot: the application uploads the
+# snapshot to Google Drive according to its own settings.
+backup_trigger_app: true
+
+# --- monitoring -------------------------------------------------------------
+monitor_on_calendar: "*:0/5"
+monitor_disk_max_percent: 85
+monitor_swap_max_percent: 50
+monitor_mem_min_available_mb: 80
+monitor_tls_min_days: 14
+monitor_alert_url: "{{ vault_monitor_alert_url | default('') }}"

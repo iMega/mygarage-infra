@@ -1,0 +1,10 @@
+---
+# The server address is not in the repository: workflows take it from the
+# secret SERVER_HOST (environment production) via MYGARAGE_HOST.
+all:
+  children:
+    mygarage:
+      hosts:
+        mygarage-prod:
+          ansible_host: "{{ lookup('ansible.builtin.env', 'MYGARAGE_HOST') }}"
+          ansible_user: ops

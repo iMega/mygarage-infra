@@ -1,0 +1,47 @@
+---
+- name: Apply pending proxy changes before the ACME challenge
+  ansible.builtin.meta: flush_handlers
+
+- name: Request certificate
+  ansible.builtin.command:
+    cmd: >-
+      certbot certonly --webroot -w /var/www/letsencrypt
+      -d {{ mygarage_domain }} --register-unsafely-without-email
+      --agree-tos --non-interactive --keep-until-expiring
+    creates: "{{ openresty_cert_dir }}/fullchain.pem"
+
+- name: Create renewal hook directory
+  ansible.builtin.file:
+    path: /etc/letsencrypt/renewal-hooks/deploy
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Reload proxy after certificate renewal
+  ansible.builtin.copy:
+    dest: /etc/letsencrypt/renewal-hooks/deploy/reload-openresty.sh
+    content: |
+      #!/bin/sh
+      # Managed by Ansible
+      /usr/local/openresty/bin/openresty -t && systemctl reload openresty
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Enable certificate renewal
+  ansible.builtin.systemd_service:
+    name: certbot-renew.timer
+    enabled: true
+    state: started
+
+- name: Enable HTTPS site
+  ansible.builtin.template:
+    src: mygarage.conf.j2
+    dest: "{{ openresty_conf_dir }}/conf.d/mygarage.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  vars:
+    openresty_tls_ready: true
+  notify: Reload openresty

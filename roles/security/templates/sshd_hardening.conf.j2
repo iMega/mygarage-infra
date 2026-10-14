@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+# Loaded before 50-redhat.conf: the first value of each option wins.
+Port {{ ssh_port }}
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+PermitEmptyPasswords no
+MaxAuthTries 3
+LoginGraceTime 30
+X11Forwarding no
+AllowUsers {{ admin_user }} {{ deploy_user }}

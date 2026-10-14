@@ -1,0 +1,12 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+# Blue/green redeploy of the current release so a changed unit or
+# environment is applied without downtime. No-op before the first release.
+- name: Restart application
+  ansible.builtin.command:
+    cmd: "{{ mygarage_app_dir }}/bin/deploy.sh --restart"
+  register: mygarage_restart
+  changed_when: "'no release deployed' not in mygarage_restart.stdout"

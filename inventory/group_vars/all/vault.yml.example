@@ -1,0 +1,9 @@
+---
+# Structure of vault.yml. Do not fill it in by hand: scripts/vault.sh asks
+# for the values, hashes the passwords and writes vault.yml encrypted.
+vault_htpasswd_users:
+  - name: garage
+    hash: "$2y$05$replace.with.bcrypt.hash"
+
+# Optional: ntfy.sh topic or any URL accepting POST with a text body.
+vault_monitor_alert_url: ""

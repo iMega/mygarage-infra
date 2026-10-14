@@ -1,0 +1,102 @@
+---
+- name: Assert supported OS
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['distribution'] == 'AlmaLinux'
+      - ansible_facts['distribution_major_version'] == '9'
+    fail_msg: "Only AlmaLinux 9 is supported"
+
+- name: Enable EPEL
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+
+- name: Install base packages
+  ansible.builtin.dnf:
+    name:
+      - chrony
+      - dnf-automatic
+      - openssl
+      - policycoreutils-python-utils
+      - python3-libselinux
+      - python3-libsemanage
+      - sqlite
+      - tar
+    state: present
+
+- name: Upgrade all packages
+  ansible.builtin.dnf:
+    name: "*"
+    state: latest  # noqa: package-latest
+    update_only: true
+  when: base_upgrade_packages | bool
+
+- name: Apply security updates automatically
+  ansible.builtin.copy:
+    dest: /etc/dnf/automatic.conf
+    content: |
+      # Managed by Ansible
+      [commands]
+      upgrade_type = security
+      download_updates = yes
+      apply_updates = yes
+      reboot = never
+
+      [emitters]
+      emit_via = stdio
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Enable dnf-automatic timer
+  ansible.builtin.systemd_service:
+    name: dnf-automatic.timer
+    enabled: true
+    state: started
+
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ timezone }}"
+
+- name: Enable chronyd
+  ansible.builtin.systemd_service:
+    name: chronyd
+    enabled: true
+    state: started
+
+- name: Create journald drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Limit journald disk usage
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/10-mygarage.conf
+    content: |
+      # Managed by Ansible
+      [Journal]
+      Storage=persistent
+      SystemMaxUse={{ journald_max_use }}
+      MaxRetentionSec=1month
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart journald
+
+- name: Tune virtual memory
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/10-mygarage.conf
+    reload: true
+  loop:
+    - { name: vm.swappiness, value: "{{ base_swappiness }}" }
+    - { name: vm.vfs_cache_pressure, value: "50" }
+  when: base_swap_enabled | bool
+
+- name: Configure swap file
+  ansible.builtin.import_tasks: swap.yml
+  when: base_swap_enabled | bool

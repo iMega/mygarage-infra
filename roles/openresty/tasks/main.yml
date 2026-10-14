@@ -1,0 +1,114 @@
+---
+- name: Add OpenResty repository
+  ansible.builtin.yum_repository:
+    name: openresty
+    description: Official OpenResty Open Source Repository for AlmaLinux
+    baseurl: https://openresty.org/package/almalinux/$releasever/$basearch
+    gpgcheck: true
+    gpgkey: https://openresty.org/package/pubkey2.gpg
+
+- name: Install OpenResty and certbot
+  ansible.builtin.dnf:
+    name:
+      - openresty
+      - certbot
+    state: present
+
+- name: Create OpenResty worker user
+  ansible.builtin.user:
+    name: openresty
+    system: true
+    shell: /sbin/nologin
+    home: /nonexistent
+    create_home: false
+
+- name: Create proxy directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ openresty_conf_dir }}/conf.d", mode: "0755" }
+    - { path: /var/www/letsencrypt, mode: "0755" }
+    - { path: "{{ deploy_state_dir }}", mode: "0755" }
+
+# Runtime state owned by deploy.sh: created once, never overwritten.
+- name: Seed active upstream
+  ansible.builtin.copy:
+    dest: "{{ deploy_state_dir }}/upstream.conf"
+    content: "server 127.0.0.1:{{ mygarage_slots.blue }};\n"
+    owner: root
+    group: root
+    mode: "0644"
+    force: false
+
+- name: Allow proxy to connect to backends (SELinux)
+  ansible.posix.seboolean:
+    name: httpd_can_network_connect
+    state: true
+    persistent: true
+  when: ansible_facts['selinux']['status'] == 'enabled'
+
+- name: Install htpasswd
+  ansible.builtin.template:
+    src: htpasswd.j2
+    dest: "{{ openresty_conf_dir }}/mygarage.htpasswd"
+    owner: root
+    group: openresty
+    mode: "0640"
+  no_log: true
+
+- name: Configure OpenResty
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: "{{ openresty_conf_dir }}/nginx.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload openresty
+
+- name: Check certificate
+  ansible.builtin.stat:
+    path: "{{ openresty_cert_dir }}/fullchain.pem"
+  register: openresty_cert
+
+- name: Configure site
+  ansible.builtin.template:
+    src: mygarage.conf.j2
+    dest: "{{ openresty_conf_dir }}/conf.d/mygarage.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  vars:
+    openresty_tls_ready: "{{ openresty_tls and openresty_cert.stat.exists }}"
+  notify: Reload openresty
+
+# conf.d holds only what this role templates: a file added by hand on the
+# server is removed on the next run.
+- name: Find site configs
+  ansible.builtin.find:
+    paths: "{{ openresty_conf_dir }}/conf.d"
+    file_type: any
+    hidden: true
+  register: openresty_site_files
+
+- name: Remove unmanaged site configs
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ openresty_site_files.files | rejectattr('path', 'in', openresty_managed_sites) }}"
+  loop_control:
+    label: "{{ item.path }}"
+  notify: Reload openresty
+
+- name: Enable OpenResty
+  ansible.builtin.systemd_service:
+    name: openresty
+    enabled: true
+    state: started
+
+- name: Issue TLS certificate
+  ansible.builtin.import_tasks: tls.yml
+  when: openresty_tls

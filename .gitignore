@@ -1,0 +1,6 @@
+.collections/
+.ansible/
+*.retry
+.vault-pass
+/test/.state/
+.DS_Store

@@ -1,0 +1,23 @@
+---
+# Local test bench: AlmaLinux 9 container with systemd (see test/run.sh).
+# Same group and group_vars as production; only host-specific overrides.
+all:
+  children:
+    mygarage:
+      hosts:
+        mygarage-test:
+          ansible_connection: community.docker.docker
+          ansible_host: mygarage-test
+          ansible_user: ops
+          ansible_docker_extra_args: ""
+          # Containers cannot manage swap.
+          base_swap_enabled: false
+          bootstrap_reboot: false
+          admin_ssh_public_keys:
+            - "{{ lookup('file', playbook_dir + '/../test/.state/admin.pub') }}"
+          deploy_ssh_public_key: "{{ lookup('file', playbook_dir + '/../test/.state/deploy.pub') }}"
+          # garage / garage
+          vault_htpasswd_users:
+            - name: garage
+              hash: "{{ lookup('file', playbook_dir + '/../test/.state/htpasswd-hash') }}"
+          vault_monitor_alert_url: ""

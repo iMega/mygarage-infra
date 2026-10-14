@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+[Unit]
+Description=myGarage health check
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/mygarage/healthcheck.env
+ExecStart={{ mygarage_app_dir }}/bin/healthcheck.sh

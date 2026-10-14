@@ -1,0 +1,67 @@
+---
+# First contact with a blank VPS, run once as root (normally by the
+# bootstrap workflow; by hand: ansible-playbook playbooks/bootstrap.yml -u root -k).
+# Creates the admin user with SSH keys and passwordless sudo, upgrades the
+# system and reboots into a new kernel. Root login is disabled later by
+# site.yml, which connects as that admin user.
+- name: Bootstrap admin access
+  hosts: mygarage
+  gather_facts: true
+  tasks:
+    - name: Assert supported OS
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] == 'AlmaLinux'
+          - ansible_facts['distribution_major_version'] == '9'
+        fail_msg: "Only AlmaLinux 9 is supported"
+
+    - name: Install sudo
+      ansible.builtin.dnf:
+        name:
+          - sudo
+          - dnf-plugins-core  # dnf needs-restarting
+        state: present
+
+    - name: Create admin user
+      ansible.builtin.user:
+        name: "{{ admin_user }}"
+        groups: wheel
+        append: true
+        shell: /bin/bash
+
+    - name: Install admin SSH keys
+      ansible.posix.authorized_key:
+        user: "{{ admin_user }}"
+        key: "{{ admin_ssh_public_keys | join('\n') }}"
+        exclusive: true
+
+    - name: Allow admin passwordless sudo
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/10-admin
+        content: "{{ admin_user }} ALL=(ALL) NOPASSWD: ALL\n"
+        owner: root
+        group: root
+        mode: "0440"
+        validate: visudo -cf %s
+
+    - name: Upgrade all packages
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest  # noqa: package-latest
+        update_only: true
+
+    - name: Check whether a reboot is needed
+      ansible.builtin.command:
+        cmd: dnf needs-restarting --reboothint
+      register: bootstrap_reboot_hint
+      changed_when: false
+      check_mode: false
+      failed_when: bootstrap_reboot_hint.rc not in [0, 1]
+      when: bootstrap_reboot | default(true) | bool
+
+    - name: Reboot into the upgraded system
+      ansible.builtin.reboot:
+        reboot_timeout: 600
+      when:
+        - bootstrap_reboot | default(true) | bool
+        - bootstrap_reboot_hint.rc == 1

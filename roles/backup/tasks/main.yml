@@ -1,0 +1,37 @@
+---
+- name: Create backup directory
+  ansible.builtin.file:
+    path: "{{ backup_dir }}"
+    state: directory
+    owner: mygarage
+    group: mygarage
+    mode: "0750"
+
+- name: Install backup script
+  ansible.builtin.copy:
+    src: backup.sh
+    dest: "{{ mygarage_app_dir }}/bin/backup.sh"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install backup units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: /etc/systemd/system/{{ item }}
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - mygarage-backup.service
+    - mygarage-backup.timer
+  notify: Reload systemd
+
+- name: Apply unit changes before enabling the timer
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable backup timer
+  ansible.builtin.systemd_service:
+    name: mygarage-backup.timer
+    enabled: true
+    state: started

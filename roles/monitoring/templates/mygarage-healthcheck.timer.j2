@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Periodic myGarage health check
+
+[Timer]
+OnCalendar={{ monitor_on_calendar }}
+OnBootSec=2min
+
+[Install]
+WantedBy=timers.target

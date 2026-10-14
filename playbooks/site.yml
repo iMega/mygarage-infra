@@ -1,0 +1,27 @@
+---
+# Converges the server to the state described in this repository.
+#   ansible-playbook playbooks/site.yml [--check --diff] [--tags proxy]
+- name: Converge MyGarage server
+  hosts: mygarage
+  become: true
+  pre_tasks:
+    - name: Refuse to run as root
+      ansible.builtin.assert:
+        that: ansible_user != 'root'
+        fail_msg: >-
+          site.yml disables root login; run bootstrap.yml first and connect
+          as {{ admin_user }} so access is proven before hardening.
+
+  roles:
+    - role: base
+      tags: [base]
+    - role: security
+      tags: [security]
+    - role: openresty
+      tags: [proxy]
+    - role: mygarage
+      tags: [app]
+    - role: backup
+      tags: [backup]
+    - role: monitoring
+      tags: [monitoring]

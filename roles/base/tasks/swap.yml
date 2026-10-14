@@ -1,0 +1,28 @@
+---
+- name: Create swap file
+  ansible.builtin.shell:
+    cmd: >-
+      dd if=/dev/zero of=/swapfile bs=1M count={{ base_swap_size_mb }}
+      && chmod 0600 /swapfile && mkswap /swapfile
+    creates: /swapfile
+
+- name: Register swap in fstab
+  ansible.posix.mount:
+    src: /swapfile
+    path: none
+    fstype: swap
+    opts: sw
+    state: present
+
+- name: Read active swap devices
+  ansible.builtin.command:
+    cmd: swapon --show=NAME --noheadings
+  register: base_swap_active
+  changed_when: false
+  check_mode: false
+
+- name: Enable swap file
+  ansible.builtin.command:
+    cmd: swapon /swapfile
+  when: "'/swapfile' not in base_swap_active.stdout"
+  changed_when: true

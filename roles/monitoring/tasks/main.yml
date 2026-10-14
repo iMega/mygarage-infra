@@ -1,0 +1,38 @@
+---
+- name: Install healthcheck script
+  ansible.builtin.copy:
+    src: healthcheck.sh
+    dest: "{{ mygarage_app_dir }}/bin/healthcheck.sh"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Configure healthcheck
+  ansible.builtin.template:
+    src: healthcheck.env.j2
+    dest: /etc/mygarage/healthcheck.env
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Install healthcheck units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: /etc/systemd/system/{{ item }}
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - mygarage-healthcheck.service
+    - mygarage-healthcheck.timer
+  notify: Reload systemd
+
+- name: Apply unit changes before enabling the timer
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable healthcheck timer
+  ansible.builtin.systemd_service:
+    name: mygarage-healthcheck.timer
+    enabled: true
+    state: started

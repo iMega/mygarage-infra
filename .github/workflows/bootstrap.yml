@@ -1,0 +1,63 @@
+---
+name: bootstrap
+
+# First configuration of a blank VPS: logs in as root with the provider's
+# password, creates the admin user, then applies site.yml, which disables
+# root and password logins. Fails on an already configured server.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type "bootstrap" to configure a blank server
+        type: string
+        required: true
+
+concurrency:
+  group: production-server
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: inputs.confirm == 'bootstrap'
+    uses: ./.github/workflows/validate.yml
+
+  bootstrap:
+    needs: validate
+    runs-on: ubuntu-24.04
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/ansible
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          ssh-key: ${{ secrets.ANSIBLE_SSH_KEY }}
+          known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          sshpass: "true"
+
+      - name: Run bootstrap.yml as root
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+          ROOT_PASSWORD: ${{ secrets.BOOTSTRAP_ROOT_PASSWORD }}
+        run: |
+          [[ -n $ROOT_PASSWORD ]] ||
+            { echo "::error::secret BOOTSTRAP_ROOT_PASSWORD is not set"; exit 1; }
+          umask 077
+          vars=$RUNNER_TEMP/root.json
+          jq -n --arg p "$ROOT_PASSWORD" '{ansible_password: $p}' > "$vars"
+          trap 'rm -f "$vars"' EXIT
+          ansible-playbook playbooks/bootstrap.yml -u root -e "@$vars"
+
+      - name: Run site.yml
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: ansible-playbook playbooks/site.yml --diff
+
+      - name: Verify SSH access
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+          ANSIBLE_SSH_ARGS: -o ControlMaster=no -o ControlPath=none
+        run: ansible mygarage -b -m ansible.builtin.command -a true

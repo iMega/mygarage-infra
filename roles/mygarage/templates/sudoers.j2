@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+# The deploy key may only install and switch releases; the scripts validate
+# their arguments.
+Defaults:{{ deploy_user }} !requiretty
+{{ deploy_user }} ALL=(root) NOPASSWD: {{ mygarage_app_dir }}/bin/deploy.sh, {{ mygarage_app_dir }}/bin/rollback.sh, {{ mygarage_app_dir }}/bin/status.sh

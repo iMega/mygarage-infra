@@ -1,0 +1,28 @@
+# {{ ansible_managed }}
+[Unit]
+Description=myGarage backup
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=mygarage
+Group=mygarage
+Environment=DATA_DIR={{ mygarage_data_dir }}
+Environment=BACKUP_DIR={{ backup_dir }}
+Environment=KEEP_DAYS={{ backup_keep_days }}
+Environment=MIN_FREE_MB={{ backup_min_free_mb }}
+Environment=TRIGGER_APP={{ '1' if backup_trigger_app | bool else '0' }}
+Environment=STATE_DIR={{ deploy_state_dir }}
+Environment=BLUE_PORT={{ mygarage_slots.blue }}
+Environment=GREEN_PORT={{ mygarage_slots.green }}
+ExecStart={{ mygarage_app_dir }}/bin/backup.sh
+UMask=0077
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths={{ backup_dir }}
+# sqlite3 .backup needs the -shm/-wal files of a WAL database.
+ReadWritePaths={{ mygarage_data_dir }}
