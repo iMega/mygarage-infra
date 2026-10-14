@@ -47,9 +47,10 @@ jobs:
             { echo "::error::secret BOOTSTRAP_ROOT_PASSWORD is not set"; exit 1; }
           umask 077
           vars=$RUNNER_TEMP/root.json
-          jq -n --arg p "$ROOT_PASSWORD" '{ansible_password: $p}' > "$vars"
+          # Extra vars: -u would lose to ansible_user from the inventory.
+          jq -n --arg p "$ROOT_PASSWORD" '{ansible_user: "root", ansible_password: $p}' > "$vars"
           trap 'rm -f "$vars"' EXIT
-          ansible-playbook playbooks/bootstrap.yml -u root -e "@$vars"
+          ansible-playbook playbooks/bootstrap.yml -e "@$vars"
 
       - name: Run site.yml
         env:

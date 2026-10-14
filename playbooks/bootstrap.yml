@@ -1,6 +1,6 @@
 ---
 # First contact with a blank VPS, run once as root (normally by the
-# bootstrap workflow; by hand: ansible-playbook playbooks/bootstrap.yml -u root -k).
+# bootstrap workflow; by hand: ansible-playbook playbooks/bootstrap.yml -e ansible_user=root -k).
 # Creates the admin user with SSH keys and passwordless sudo, upgrades the
 # system and reboots into a new kernel. Root login is disabled later by
 # site.yml, which connects as that admin user.
