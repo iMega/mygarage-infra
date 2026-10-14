@@ -2,8 +2,8 @@
 # First contact with a blank VPS, run once as root (normally by the
 # bootstrap workflow; by hand: ansible-playbook playbooks/bootstrap.yml -e ansible_user=root -k).
 # Creates the admin user with SSH keys and passwordless sudo, upgrades the
-# system and reboots into a new kernel. Root login is disabled later by
-# site.yml, which connects as that admin user.
+# system and reboots into a new kernel. SSH access (root, passwords) is set
+# later by site.yml, which connects as that admin user.
 - name: Bootstrap admin access
   hosts: mygarage
   gather_facts: true
@@ -14,6 +14,14 @@
           - ansible_facts['distribution'] == 'AlmaLinux'
           - ansible_facts['distribution_major_version'] == '9'
         fail_msg: "Only AlmaLinux 9 is supported"
+
+    # dnf needs several hundred MB for repository metadata: on a 1 GB VPS
+    # without swap it is OOM-killed (rc -9) before anything is installed.
+    - name: Create swap before using dnf
+      ansible.builtin.include_role:
+        name: base
+        tasks_from: swap
+      when: base_swap_enabled | bool
 
     - name: Install sudo
       ansible.builtin.dnf:
