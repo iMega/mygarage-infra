@@ -2,9 +2,10 @@
 # Creates inventory/group_vars/all/vault.yml: asks for the application
 # logins and passwords and the alert URL, hashes the passwords (bcrypt),
 # encrypts the result with a new random vault password and hands that
-# password over (clipboard on macOS, otherwise the terminal) to be saved as
-# the GitHub secret ANSIBLE_VAULT_PASSWORD (environment production) - the
-# only place it is kept. vault.yml is replaced after that is confirmed.
+# password over (clipboard on macOS, otherwise the terminal), guiding through
+# saving it as the GitHub secret ANSIBLE_VAULT_PASSWORD (environment
+# production) - the only place it is kept. vault.yml is replaced after that
+# is confirmed; the clipboard is cleared on exit.
 # Neither the passwords nor the plaintext vault touch the disk; the vault
 # cannot be read back, so every run replaces it as a whole.
 #
@@ -95,28 +96,40 @@ export ANSIBLE_VAULT_PASSWORD
 
 clipboard=no
 command -v pbcopy >/dev/null && clipboard=yes
+copied=no
 
 tmp="$VAULT_FILE.new"
 cleanup() {
     rm -f "$tmp"
-    if [[ $clipboard == yes ]]; then pbcopy </dev/null; fi
+    if [[ $copied == yes ]]; then pbcopy </dev/null; fi
 }
 trap cleanup EXIT
 printf '%s' "$vault" | in_docker ansible-vault encrypt --output "$tmp" - >/dev/null
 
+# The password reaches the clipboard only once the GitHub form is open and
+# leaves it as soon as the secret is saved.
 echo
-echo "Save the vault password in GitHub:"
-echo "  mygarage-infra → Settings → Environments → production →"
-echo "  Environment secrets → $SECRET (Add secret / edit) → paste → Save."
+echo "Step 1/2. Open the secret form in GitHub:"
+echo "  mygarage-infra → Settings → Environments → production → Environment secrets"
+echo "  → Add environment secret, Name: $SECRET"
+echo "  (already exists → pencil icon next to $SECRET)"
+read -r -p "Press Enter when the form is open (Ctrl-C aborts, $VAULT_FILE stays unchanged): " _
+
+echo
+echo "Step 2/2. Paste the password into Value and click Add secret / Update secret."
 if [[ $clipboard == yes ]]; then
     printf '%s' "$ANSIBLE_VAULT_PASSWORD" | pbcopy
-    echo "The password is in the clipboard; it is cleared when this script exits."
+    copied=yes
+    echo "  The password is in the clipboard."
 else
-    echo "Password: $ANSIBLE_VAULT_PASSWORD"
+    echo "  Password: $ANSIBLE_VAULT_PASSWORD"
 fi
 while :; do
-    read -r -p "Type 'saved' when done (Ctrl-C aborts, $VAULT_FILE stays unchanged): " answer
-    [[ $answer == saved ]] && break
+    read -r -p "Press Enter when the secret is saved, c + Enter to copy it again: " answer
+    case $answer in
+        "") break ;;
+        c) [[ $clipboard == yes ]] && printf '%s' "$ANSIBLE_VAULT_PASSWORD" | pbcopy ;;
+    esac
 done
 
 mv -f "$tmp" "$VAULT_FILE"

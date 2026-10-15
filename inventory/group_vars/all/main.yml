@@ -29,10 +29,12 @@ journald_max_use: 200M
 firewall_enabled: true
 
 # --- proxy ------------------------------------------------------------------
-# Empty domain serves plain HTTP on the IP address; set it together with a DNS
-# A record before enabling TLS.
-mygarage_domain: ""
-mygarage_tls_enabled: false
+# The domain comes from the GitHub secret MYGARAGE_DOMAIN (masked in the
+# public Actions logs), like the server address. Empty serves plain HTTP on
+# the IP address; once set, a Let's Encrypt certificate is issued, so the
+# DNS A record must point at the server first.
+mygarage_domain: "{{ lookup('ansible.builtin.env', 'MYGARAGE_DOMAIN') }}"
+mygarage_tls_enabled: true
 proxy_check_port: 8080
 proxy_client_max_body_size: 20m
 htpasswd_users: "{{ vault_htpasswd_users }}"

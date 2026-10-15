@@ -34,6 +34,7 @@ jobs:
       - uses: ./.github/actions/ansible
         with:
           host: ${{ secrets.SERVER_HOST }}
+          domain: ${{ secrets.MYGARAGE_DOMAIN }}
           ssh-key: ${{ secrets.ANSIBLE_SSH_KEY }}
           known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
           sshpass: "true"
