@@ -1,0 +1,55 @@
+# {{ ansible_managed }}
+# Static site: https://{{ site_domain }} serves {{ site_root }};
+# http:// and www. redirect there.
+
+server {
+    listen 80;
+    server_name {{ site_domain }} www.{{ site_domain }};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+    }
+
+{% if openresty_tls_ready | bool %}
+    location / {
+        return 301 https://{{ site_domain }}$request_uri;
+    }
+{% else %}
+    root {{ site_root }};
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+{% endif %}
+}
+{% if openresty_tls_ready | bool %}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name www.{{ site_domain }};
+
+    ssl_certificate {{ openresty_site_cert_dir }}/fullchain.pem;
+    ssl_certificate_key {{ openresty_site_cert_dir }}/privkey.pem;
+
+    return 301 https://{{ site_domain }}$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name {{ site_domain }};
+
+    ssl_certificate {{ openresty_site_cert_dir }}/fullchain.pem;
+    ssl_certificate_key {{ openresty_site_cert_dir }}/privkey.pem;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    root {{ site_root }};
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}
+{% endif %}

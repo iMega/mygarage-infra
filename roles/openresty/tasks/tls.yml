@@ -2,13 +2,17 @@
 - name: Apply pending proxy changes before the ACME challenge
   ansible.builtin.meta: flush_handlers
 
-- name: Request certificate
+- name: Request certificates
   ansible.builtin.command:
     cmd: >-
       certbot certonly --webroot -w /var/www/letsencrypt
-      -d {{ mygarage_domain }} --register-unsafely-without-email
+      --cert-name {{ item.name }} -d {{ item.domains | join(' -d ') }}
+      --register-unsafely-without-email
       --agree-tos --non-interactive --keep-until-expiring
-    creates: "{{ openresty_cert_dir }}/fullchain.pem"
+    creates: /etc/letsencrypt/live/{{ item.name }}/fullchain.pem
+  loop: "{{ openresty_certificates }}"
+  loop_control:
+    label: "{{ item.name }}"
 
 - name: Create renewal hook directory
   ansible.builtin.file:
@@ -35,13 +39,16 @@
     enabled: true
     state: started
 
-- name: Enable HTTPS site
+- name: Enable HTTPS sites
   ansible.builtin.template:
-    src: mygarage.conf.j2
-    dest: "{{ openresty_conf_dir }}/conf.d/mygarage.conf"
+    src: "{{ item.conf }}.j2"
+    dest: "{{ openresty_conf_dir }}/conf.d/{{ item.conf }}"
     owner: root
     group: root
     mode: "0644"
+  loop: "{{ openresty_sites | selectattr('tls') }}"
+  loop_control:
+    label: "{{ item.conf }}"
   vars:
     openresty_tls_ready: true
   notify: Reload openresty

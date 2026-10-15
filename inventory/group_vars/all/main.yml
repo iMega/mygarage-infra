@@ -39,6 +39,13 @@ proxy_check_port: 8080
 proxy_client_max_body_size: 20m
 htpasswd_users: "{{ vault_htpasswd_users }}"
 
+# --- static site ------------------------------------------------------------
+# Domain from the GitHub secret SITE_DOMAIN; empty disables the site. site/
+# of this repository is published at https://<domain>; http:// and
+# www.<domain> redirect there. TLS follows mygarage_tls_enabled.
+site_domain: "{{ lookup('ansible.builtin.env', 'SITE_DOMAIN') }}"
+site_root: /var/www/site
+
 # --- application ------------------------------------------------------------
 mygarage_slots:
   blue: 8081

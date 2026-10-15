@@ -9,6 +9,9 @@ inputs:
   domain:
     description: Application domain (secret MYGARAGE_DOMAIN), exported as MYGARAGE_DOMAIN; empty = HTTP on the IP
     default: ""
+  site-domain:
+    description: Static site domain (secret SITE_DOMAIN), exported as SITE_DOMAIN; empty = no site
+    default: ""
   ssh-key:
     description: Private key of the ci-ansible user (ops)
     required: true
@@ -42,6 +45,7 @@ runs:
       env:
         HOST: ${{ inputs.host }}
         DOMAIN: ${{ inputs.domain }}
+        SITE_DOMAIN: ${{ inputs.site-domain }}
         SSH_KEY: ${{ inputs.ssh-key }}
         KNOWN_HOSTS: ${{ inputs.known-hosts }}
       run: |
@@ -49,6 +53,7 @@ runs:
           { echo "::error::SERVER_HOST, ANSIBLE_SSH_KEY and SSH_KNOWN_HOSTS must be set"; exit 1; }
         echo "MYGARAGE_HOST=$HOST" >> "$GITHUB_ENV"
         echo "MYGARAGE_DOMAIN=$DOMAIN" >> "$GITHUB_ENV"
+        echo "SITE_DOMAIN=$SITE_DOMAIN" >> "$GITHUB_ENV"
         install -m 700 -d ~/.ssh
         printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
         chmod 600 ~/.ssh/id_ed25519

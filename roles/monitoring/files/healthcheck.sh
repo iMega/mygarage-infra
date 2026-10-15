@@ -33,13 +33,13 @@ fi
 disk=$(df -P / | awk 'NR == 2 { sub("%", "", $5); print $5 }')
 ((disk <= DISK_MAX_PERCENT)) || problem "disk / ${disk}% used"
 
-if [[ -n $TLS_CERT ]]; then
-    if [[ ! -r $TLS_CERT ]]; then
-        problem "TLS certificate missing: $TLS_CERT"
-    elif ! openssl x509 -checkend $((TLS_MIN_DAYS * 86400)) -noout -in "$TLS_CERT" >/dev/null; then
-        problem "TLS certificate expires within ${TLS_MIN_DAYS} days"
+for cert in ${TLS_CERTS:-}; do
+    if [[ ! -r $cert ]]; then
+        problem "TLS certificate missing: $cert"
+    elif ! openssl x509 -checkend $((TLS_MIN_DAYS * 86400)) -noout -in "$cert" >/dev/null; then
+        problem "TLS certificate $cert expires within ${TLS_MIN_DAYS} days"
     fi
-fi
+done
 
 systemctl is-failed --quiet mygarage-backup.service && problem "last backup run failed"
 # Age is checked once the first backup exists, so a fresh server stays quiet
@@ -54,7 +54,7 @@ if ((${#problems[@]} == 0)); then
     exit 0
 fi
 
-msg="myGarage $(hostname): $(printf '%s; ' "${problems[@]}")"
+msg="myGarage $(uname -n): $(printf '%s; ' "${problems[@]}")"
 logger -p user.err -t mygarage-healthcheck -- "$msg"
 echo "$msg" >&2
 if [[ -n ${ALERT_URL:-} ]]; then

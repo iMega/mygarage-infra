@@ -69,20 +69,29 @@
     mode: "0644"
   notify: Reload openresty
 
-- name: Check certificate
+- name: Check certificates
   ansible.builtin.stat:
-    path: "{{ openresty_cert_dir }}/fullchain.pem"
-  register: openresty_cert
+    path: "{{ item.cert }}/fullchain.pem"
+  loop: "{{ openresty_sites }}"
+  loop_control:
+    label: "{{ item.conf }}"
+  register: openresty_certs
 
-- name: Configure site
+# HTTPS server blocks are rendered only once their certificate exists, so a
+# missing certificate never breaks the configuration; tls.yml issues it and
+# renders them.
+- name: Configure sites
   ansible.builtin.template:
-    src: mygarage.conf.j2
-    dest: "{{ openresty_conf_dir }}/conf.d/mygarage.conf"
+    src: "{{ item.item.conf }}.j2"
+    dest: "{{ openresty_conf_dir }}/conf.d/{{ item.item.conf }}"
     owner: root
     group: root
     mode: "0644"
+  loop: "{{ openresty_certs.results }}"
+  loop_control:
+    label: "{{ item.item.conf }}"
   vars:
-    openresty_tls_ready: "{{ openresty_tls and openresty_cert.stat.exists }}"
+    openresty_tls_ready: "{{ item.item.tls and item.stat.exists }}"
   notify: Reload openresty
 
 # conf.d holds only what this role templates: a file added by hand on the
@@ -98,7 +107,9 @@
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: absent
-  loop: "{{ openresty_site_files.files | rejectattr('path', 'in', openresty_managed_sites) }}"
+  loop: >-
+    {{ openresty_site_files.files | rejectattr('path', 'in',
+       openresty_sites | map(attribute='conf') | map('regex_replace', '^', openresty_conf_dir + '/conf.d/')) }}
   loop_control:
     label: "{{ item.path }}"
   notify: Reload openresty
@@ -109,6 +120,10 @@
     enabled: true
     state: started
 
-- name: Issue TLS certificate
+- name: Publish static site
+  ansible.builtin.import_tasks: site.yml
+  when: openresty_site_enabled
+
+- name: Issue TLS certificates
   ansible.builtin.import_tasks: tls.yml
-  when: openresty_tls
+  when: openresty_certificates | length > 0

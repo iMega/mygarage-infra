@@ -47,9 +47,6 @@ server {
 
     ssl_certificate {{ openresty_cert_dir }}/fullchain.pem;
     ssl_certificate_key {{ openresty_cert_dir }}/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_session_cache shared:SSL:5m;
-    ssl_session_timeout 1d;
     add_header Strict-Transport-Security "max-age=31536000" always;
 
     client_max_body_size {{ proxy_client_max_body_size }};
