@@ -19,6 +19,9 @@
       tags: [security]
     - role: openresty
       tags: [proxy]
+    - role: site
+      tags: [site]
+      when: site_domain | length > 0
     - role: mygarage
       tags: [app]
     - role: backup

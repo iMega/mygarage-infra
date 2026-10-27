@@ -19,7 +19,7 @@ readonly INVENTORY=test/inventory/test.yml
 export ANSIBLE_VAULT_PASSWORD=${ANSIBLE_VAULT_PASSWORD:-unused}
 
 mkdir -p "$STATE"
-for key in admin deploy; do
+for key in admin deploy site-production site-test; do
     [[ -f $STATE/$key ]] || ssh-keygen -q -t ed25519 -N '' -C "mygarage-test-$key" -f "$STATE/$key"
 done
 [[ -f $STATE/htpasswd-hash ]] || openssl passwd -apr1 garage >"$STATE/htpasswd-hash"

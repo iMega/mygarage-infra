@@ -22,3 +22,10 @@ all:
             - name: garage
               hash: "{{ lookup('file', playbook_dir + '/../test/.state/htpasswd-hash') }}"
           vault_monitor_alert_url: ""
+          # Static sites by Host header (site.test, test.site.test), no TLS.
+          site_domain: site.test
+          site_test_enabled: true
+          mygarage_tls_enabled: false
+          site_deploy_ssh_public_keys:
+            production: "{{ lookup('file', playbook_dir + '/../test/.state/site-production.pub') }}"
+            test: "{{ lookup('file', playbook_dir + '/../test/.state/site-test.pub') }}"

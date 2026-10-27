@@ -5,6 +5,9 @@ openresty_tls: "{{ (mygarage_tls_enabled | bool) and (mygarage_domain | length >
 openresty_site_enabled: "{{ site_domain | length > 0 }}"
 openresty_site_cert_dir: /etc/letsencrypt/live/{{ site_domain }}
 openresty_site_tls: "{{ (mygarage_tls_enabled | bool) and openresty_site_enabled }}"
+openresty_site_test_enabled: "{{ openresty_site_enabled and (site_test_enabled | bool) }}"
+openresty_site_test_cert_dir: /etc/letsencrypt/live/{{ site_test_domain }}
+openresty_site_test_tls: "{{ (mygarage_tls_enabled | bool) and openresty_site_test_enabled }}"
 
 # Site configs this role templates; anything else in conf.d is removed.
 # tls: HTTPS is wanted; cert: where certbot puts the certificate.
@@ -13,6 +16,8 @@ openresty_sites: >-
     [{'conf': 'mygarage.conf', 'tls': openresty_tls, 'cert': openresty_cert_dir}]
     + ([{'conf': 'site.conf', 'tls': openresty_site_tls, 'cert': openresty_site_cert_dir}]
        if openresty_site_enabled else [])
+    + ([{'conf': 'site-test.conf', 'tls': openresty_site_test_tls, 'cert': openresty_site_test_cert_dir}]
+       if openresty_site_test_enabled else [])
   }}
 
 # One certificate per name; certbot stores it in /etc/letsencrypt/live/<name>.
@@ -21,4 +26,6 @@ openresty_certificates: >-
     ([{'name': mygarage_domain, 'domains': [mygarage_domain]}] if openresty_tls else [])
     + ([{'name': site_domain, 'domains': [site_domain, 'www.' + site_domain]}]
        if openresty_site_tls else [])
+    + ([{'name': site_test_domain, 'domains': [site_test_domain]}]
+       if openresty_site_test_tls else [])
   }}

@@ -120,10 +120,6 @@
     enabled: true
     state: started
 
-- name: Publish static site
-  ansible.builtin.import_tasks: site.yml
-  when: openresty_site_enabled
-
 - name: Issue TLS certificates
   ansible.builtin.import_tasks: tls.yml
   when: openresty_certificates | length > 0

@@ -1,0 +1,6 @@
+# {{ ansible_managed }}
+# One key per environment of the website repository; the forced command
+# fixes where the key may publish.
+{% for env, key in site_deploy_ssh_public_keys.items() if key %}
+command="{{ site_bin_dir }}/site-receive.sh {{ env }}",restrict {{ key }}
+{% endfor %}

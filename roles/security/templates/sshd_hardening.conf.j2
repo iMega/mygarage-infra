@@ -9,4 +9,4 @@ PermitEmptyPasswords no
 MaxAuthTries 3
 LoginGraceTime 30
 X11Forwarding no
-AllowUsers {{ admin_user }} {{ deploy_user }}{{ ' root' if ssh_permit_root_login | bool else '' }}
+AllowUsers {{ admin_user }} {{ deploy_user }}{{ (' ' + site_user) if site_domain | length > 0 else '' }}{{ ' root' if ssh_permit_root_login | bool else '' }}

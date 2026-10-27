@@ -1,0 +1,109 @@
+---
+# The website repository publishes releases through site-receive.sh; this
+# role prepares the user, the keys and the layout, and never touches the
+# releases themselves:
+#   <site_root>/releases/<env>-<ts>-<sha>/   uploaded releases
+#   <site_root>/releases/seed/               site/ of this repository
+#   <site_root>/{production,test}            symlink to the served release
+- name: Create site deploy user
+  ansible.builtin.user:
+    name: "{{ site_user }}"
+    shell: /bin/bash
+
+- name: Create site SSH directory
+  ansible.builtin.file:
+    path: /home/{{ site_user }}/.ssh
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# Owned by root: the site user can neither add keys nor drop the forced
+# command that pins each key to its environment.
+- name: Install site deploy keys
+  ansible.builtin.template:
+    src: authorized_keys.j2
+    dest: /home/{{ site_user }}/.ssh/authorized_keys
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create site directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.owner }}"
+    mode: "0755"
+  loop:
+    - { path: "{{ site_bin_dir }}", owner: root }
+    - { path: "{{ site_root }}", owner: "{{ site_user }}" }
+    - { path: "{{ site_root }}/releases", owner: "{{ site_user }}" }
+
+- name: Configure site receiver
+  ansible.builtin.copy:
+    dest: /etc/site-deploy.env
+    content: |
+      # Managed by Ansible
+      SITE_ROOT={{ site_root }}
+      RELEASES_KEEP={{ site_releases_keep }}
+      MAX_UPLOAD_MB={{ site_max_upload_mb }}
+      MAX_UNPACKED_MB={{ site_max_unpacked_mb }}
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install site receiver
+  ansible.builtin.copy:
+    src: site-receive.sh
+    dest: "{{ site_bin_dir }}/site-receive.sh"
+    owner: root
+    group: root
+    mode: "0755"
+
+# Served until the first upload; root-owned, so never pruned.
+- name: Install seed release
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../site/"
+    dest: "{{ site_root }}/releases/seed/"
+    owner: root
+    group: root
+    mode: "0644"
+    directory_mode: "0755"
+
+# Runtime state owned by site-receive.sh: created once, never overwritten.
+- name: Check published environments
+  ansible.builtin.stat:
+    path: "{{ site_root }}/{{ item }}"
+  loop: [production, test]
+  register: site_envs
+
+- name: Point new environments at the seed release
+  ansible.builtin.file:
+    src: releases/seed
+    dest: "{{ site_root }}/{{ item.item }}"
+    state: link
+    owner: "{{ site_user }}"
+    group: "{{ site_user }}"
+    force: true
+  loop: "{{ site_envs.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: not item.stat.exists
+
+# Leftovers of the old layout (files copied straight into the site root).
+- name: Find site root entries
+  ansible.builtin.find:
+    paths: "{{ site_root }}"
+    file_type: any
+  register: site_root_entries
+
+- name: Remove unmanaged site root entries
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: >-
+    {{ site_root_entries.files | rejectattr('path', 'in',
+       ['releases', 'production', 'test'] | map('regex_replace', '^', site_root + '/')) }}
+  loop_control:
+    label: "{{ item.path }}"

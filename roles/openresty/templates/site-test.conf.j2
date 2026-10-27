@@ -1,0 +1,50 @@
+# {{ ansible_managed }}
+# Test site: https://{{ site_test_domain }} serves the release of the last
+# deployed pull request; never indexed, never cached.
+
+{% macro site() %}
+{% if site_test_auth | bool %}
+    auth_basic "test";
+    auth_basic_user_file mygarage.htpasswd;
+{% endif %}
+    add_header X-Robots-Tag "noindex, nofollow" always;
+    add_header Cache-Control "no-store" always;
+
+    root {{ site_root }}/test;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+{% endmacro %}
+server {
+    listen 80;
+    server_name {{ site_test_domain }};
+
+    location /.well-known/acme-challenge/ {
+        auth_basic off;
+        root /var/www/letsencrypt;
+    }
+
+{% if openresty_tls_ready | bool %}
+    location / {
+        return 301 https://{{ site_test_domain }}$request_uri;
+    }
+{% else %}
+{{ site() }}
+{% endif %}
+}
+{% if openresty_tls_ready | bool %}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name {{ site_test_domain }};
+
+    ssl_certificate {{ openresty_site_test_cert_dir }}/fullchain.pem;
+    ssl_certificate_key {{ openresty_site_test_cert_dir }}/privkey.pem;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+{{ site() }}
+}
+{% endif %}

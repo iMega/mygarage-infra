@@ -1,5 +1,5 @@
 # {{ ansible_managed }}
-# Static site: https://{{ site_domain }} serves {{ site_root }};
+# Static site: https://{{ site_domain }} serves the production release;
 # http:// and www. redirect there.
 
 server {
@@ -15,7 +15,7 @@ server {
         return 301 https://{{ site_domain }}$request_uri;
     }
 {% else %}
-    root {{ site_root }};
+    root {{ site_root }}/production;
     index index.html;
 
     location / {
@@ -45,7 +45,7 @@ server {
     ssl_certificate_key {{ openresty_site_cert_dir }}/privkey.pem;
     add_header Strict-Transport-Security "max-age=31536000" always;
 
-    root {{ site_root }};
+    root {{ site_root }}/production;
     index index.html;
 
     location / {
