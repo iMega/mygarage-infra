@@ -21,6 +21,10 @@ all:
           vault_htpasswd_users:
             - name: garage
               hash: "{{ lookup('file', playbook_dir + '/../test/.state/htpasswd-hash') }}"
+          # test / testtest
+          vault_site_test_htpasswd_users:
+            - name: test
+              hash: "{{ lookup('file', playbook_dir + '/../test/.state/site-test-htpasswd-hash') }}"
           vault_monitor_alert_url: ""
           # Static sites by Host header (site.test, test.site.test), no TLS.
           site_domain: site.test

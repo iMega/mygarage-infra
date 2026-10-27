@@ -9,7 +9,8 @@ readonly NAME=mygarage-test
 readonly STATE=test/.state
 readonly WORK=$STATE/site
 readonly PROXY=http://127.0.0.1:18080
-readonly AUTH=garage:garage
+readonly AUTH=test:testtest
+readonly APP_AUTH=garage:garage
 
 pass() { printf '\033[32mPASS\033[0m %s\n' "$*"; }
 fail() { printf '\033[31mFAIL\033[0m %s\n' "$*"; exit 1; }
@@ -64,7 +65,9 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: test.site.test' "$PROXY/
 page test.site.test -u "$AUTH" | grep -q 'Coming soon' || fail "test does not serve the seed"
 curl -fsS -o /dev/null -D - -u "$AUTH" -H 'Host: test.site.test' "$PROXY/" | grep -qi '^x-robots-tag: noindex' ||
     fail "test is indexable"
-pass "seed on both environments, test behind basic auth and noindex"
+code=$(curl -s -o /dev/null -w '%{http_code}' -u "$APP_AUTH" -H 'Host: test.site.test' "$PROXY/")
+[[ $code == 401 ]] || fail "test accepted the application login ($code)"
+pass "seed on both environments, test behind its own basic auth and noindex"
 
 echo "== 2. pull request to test"
 release "$WORK/pr" "pull request"

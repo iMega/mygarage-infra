@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Creates inventory/group_vars/all/vault.yml: asks for the application
-# logins and passwords and the alert URL, hashes the passwords (bcrypt),
+# Creates inventory/group_vars/all/vault.yml: asks for the logins of the
+# application and of the test site and the alert URL, hashes them (bcrypt),
 # encrypts the result with a new random vault password and hands that
 # password over (clipboard on macOS, otherwise the terminal), guiding through
 # saving it as the GitHub secret ANSIBLE_VAULT_PASSWORD (environment
@@ -47,34 +47,60 @@ in_docker() {
         "$IMAGE" "$@"
 }
 
+# ask_users <default login> <required>: reads logins and passwords until an
+# empty login into $users, a YAML list of {name, hash}. required=no accepts
+# no login at all and offers no default.
+ask_users() {
+    local first=$1 required=$2 prompt name pass1 pass2 hash
+    users=""
+    while :; do
+        if [[ -n $users ]]; then
+            prompt="Login (empty = done): "
+        elif [[ $required == yes ]]; then
+            prompt="Login [$first]: "
+        else
+            prompt="Login (empty = none): "
+        fi
+        read -r -p "$prompt" name
+        [[ -z $users && $required == yes ]] && name=${name:-$first}
+        [[ -z $name ]] && break
+        [[ $name =~ ^[A-Za-z0-9._-]+$ ]] || { echo "  letters, digits, . _ - only"; continue; }
+
+        read -r -s -p "Password for $name: " pass1 && echo
+        read -r -s -p "Repeat: " pass2 && echo
+        if [[ $pass1 != "$pass2" ]]; then
+            echo "  passwords differ"
+            continue
+        fi
+        if ((${#pass1} < 12)); then
+            echo "  at least 12 characters"
+            continue
+        fi
+
+        # Password goes through stdin, never through arguments or environment.
+        hash=$(printf '%s' "$pass1" | in_docker htpasswd -niB "$name" | cut -d: -f2-)
+        unset pass1 pass2
+        [[ $hash == \$2y\$* ]] || die "htpasswd failed"
+        users+="  - name: $name"$'\n'"    hash: \"$hash\""$'\n'
+    done
+    [[ -n $users || $required == no ]] || die "at least one login is required"
+}
+
 # --- application users --------------------------------------------------------
-users=""
-while :; do
-    default=""
-    [[ -z $users ]] && default=garage
-    read -r -p "Login${default:+ [$default]}${users:+ (empty = done)}: " name
-    name=${name:-$default}
-    [[ -z $name ]] && break
-    [[ $name =~ ^[A-Za-z0-9._-]+$ ]] || { echo "  letters, digits, . _ - only"; continue; }
+echo "Logins of the application."
+ask_users garage yes
+app_users=$users
 
-    read -r -s -p "Password for $name: " pass1 && echo
-    read -r -s -p "Repeat: " pass2 && echo
-    if [[ $pass1 != "$pass2" ]]; then
-        echo "  passwords differ"
-        continue
-    fi
-    if ((${#pass1} < 12)); then
-        echo "  at least 12 characters"
-        continue
-    fi
-
-    # Password goes through stdin, never through arguments or environment.
-    hash=$(printf '%s' "$pass1" | in_docker htpasswd -niB "$name" | cut -d: -f2-)
-    unset pass1 pass2
-    [[ $hash == \$2y\$* ]] || die "htpasswd failed"
-    users+="  - name: $name"$'\n'"    hash: \"$hash\""$'\n'
-done
-[[ -n $users ]] || die "at least one login is required"
+# --- test site users ----------------------------------------------------------
+echo "Logins of the test site test.<site domain>, separate from the application;"
+echo "required once site_test_enabled is true."
+ask_users test no
+site_test_users=$users
+if [[ -n $site_test_users ]]; then
+    site_test_users=$'\n'$site_test_users
+else
+    site_test_users=$' []\n'
+fi
 
 # --- monitoring ---------------------------------------------------------------
 echo "Alert URL receives monitoring problems as POST, e.g. https://ntfy.sh/<secret-topic>."
@@ -86,7 +112,8 @@ done
 
 vault="---
 vault_htpasswd_users:
-${users}
+${app_users}
+vault_site_test_htpasswd_users:${site_test_users}
 vault_monitor_alert_url: \"${alert_url}\"
 "
 

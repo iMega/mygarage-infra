@@ -51,13 +51,26 @@
     persistent: true
   when: ansible_facts['selinux']['status'] == 'enabled'
 
-- name: Install htpasswd
+- name: Assert test site logins are configured
+  ansible.builtin.assert:
+    that: site_test_htpasswd_users | length > 0
+    fail_msg: >-
+      site_test_auth is on but vault_site_test_htpasswd_users is empty: run
+      scripts/vault.sh, commit and push the new vault.yml
+  when: openresty_site_test_auth
+
+- name: Install htpasswd files
   ansible.builtin.template:
     src: htpasswd.j2
-    dest: "{{ openresty_conf_dir }}/mygarage.htpasswd"
+    dest: "{{ openresty_conf_dir }}/{{ item.file }}"
     owner: root
     group: openresty
     mode: "0640"
+  loop: "{{ openresty_htpasswd_files }}"
+  loop_control:
+    label: "{{ item.file }}"
+  vars:
+    htpasswd_file_users: "{{ item.users }}"
   no_log: true
 
 - name: Configure OpenResty

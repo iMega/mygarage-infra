@@ -43,13 +43,16 @@ htpasswd_users: "{{ vault_htpasswd_users }}"
 # Domain from the GitHub secret SITE_DOMAIN; empty disables the site. The
 # website repository publishes over SSH (site-receive.sh): production at
 # https://<domain> (http:// and www.<domain> redirect there), pull requests
-# at https://test.<domain> behind basic auth. site/ of this repository is
+# at https://test.<domain> behind its own basic auth. site/ of this repository is
 # served until the first upload. TLS follows mygarage_tls_enabled.
 site_domain: "{{ lookup('ansible.builtin.env', 'SITE_DOMAIN') }}"
 # Needs the DNS record test.<domain> before it is enabled (certificate).
 site_test_enabled: true
 site_test_domain: test.{{ site_domain }}
+# Basic auth of test.<domain>: its own logins (scripts/vault.sh), not the
+# application's.
 site_test_auth: true
+site_test_htpasswd_users: "{{ vault_site_test_htpasswd_users | default([]) }}"
 site_root: /var/www/site
 site_bin_dir: /opt/site/bin
 site_user: site

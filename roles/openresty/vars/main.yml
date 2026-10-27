@@ -8,6 +8,15 @@ openresty_site_tls: "{{ (mygarage_tls_enabled | bool) and openresty_site_enabled
 openresty_site_test_enabled: "{{ openresty_site_enabled and (site_test_enabled | bool) }}"
 openresty_site_test_cert_dir: /etc/letsencrypt/live/{{ site_test_domain }}
 openresty_site_test_tls: "{{ (mygarage_tls_enabled | bool) and openresty_site_test_enabled }}"
+openresty_site_test_auth: "{{ openresty_site_test_enabled and (site_test_auth | bool) }}"
+
+# Basic auth user files, one per protected site.
+openresty_htpasswd_files: >-
+  {{
+    [{'file': 'mygarage.htpasswd', 'users': htpasswd_users}]
+    + ([{'file': 'site-test.htpasswd', 'users': site_test_htpasswd_users}]
+       if openresty_site_test_auth else [])
+  }}
 
 # Site configs this role templates; anything else in conf.d is removed.
 # tls: HTTPS is wanted; cert: where certbot puts the certificate.

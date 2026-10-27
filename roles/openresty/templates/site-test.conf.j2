@@ -5,7 +5,7 @@
 {% macro site() %}
 {% if site_test_auth | bool %}
     auth_basic "test";
-    auth_basic_user_file mygarage.htpasswd;
+    auth_basic_user_file site-test.htpasswd;
 {% endif %}
     add_header X-Robots-Tag "noindex, nofollow" always;
     add_header Cache-Control "no-store" always;

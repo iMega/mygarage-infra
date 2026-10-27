@@ -5,5 +5,10 @@ vault_htpasswd_users:
   - name: garage
     hash: "$2y$05$replace.with.bcrypt.hash"
 
+# Logins of test.<site domain>; required once site_test_enabled is true.
+vault_site_test_htpasswd_users:
+  - name: test
+    hash: "$2y$05$replace.with.bcrypt.hash"
+
 # Optional: ntfy.sh topic or any URL accepting POST with a text body.
 vault_monitor_alert_url: ""

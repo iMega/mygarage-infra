@@ -5,7 +5,7 @@
 #   test/run.sh --keep     reuse the running container, run site only
 #
 # Needs Docker and ansible-playbook in PATH. Proxy: http://127.0.0.1:18080
-# (basic auth garage/garage).
+# (basic auth garage/garage; test site test/testtest).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -23,6 +23,7 @@ for key in admin deploy site-production site-test; do
     [[ -f $STATE/$key ]] || ssh-keygen -q -t ed25519 -N '' -C "mygarage-test-$key" -f "$STATE/$key"
 done
 [[ -f $STATE/htpasswd-hash ]] || openssl passwd -apr1 garage >"$STATE/htpasswd-hash"
+[[ -f $STATE/site-test-htpasswd-hash ]] || openssl passwd -apr1 testtest >"$STATE/site-test-htpasswd-hash"
 
 ansible-galaxy collection install -r requirements.yml -p .collections >/dev/null
 
