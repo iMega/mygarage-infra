@@ -31,6 +31,7 @@
     mode: "{{ item.mode }}"
   loop:
     - { path: "{{ openresty_conf_dir }}/conf.d", mode: "0755" }
+    - { path: "{{ openresty_conf_dir }}/lua", mode: "0755" }
     - { path: /var/www/letsencrypt, mode: "0755" }
     - { path: "{{ deploy_state_dir }}", mode: "0755" }
 
@@ -72,6 +73,15 @@
   vars:
     htpasswd_file_users: "{{ item.users }}"
   no_log: true
+
+- name: Install Lua modules
+  ansible.builtin.copy:
+    src: site_lang.lua
+    dest: "{{ openresty_conf_dir }}/lua/site_lang.lua"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload openresty
 
 - name: Configure OpenResty
   ansible.builtin.template:

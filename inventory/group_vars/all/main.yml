@@ -54,6 +54,9 @@ site_test_domain: test.{{ site_domain }}
 site_test_auth: true
 site_test_htpasswd_users: "{{ vault_site_test_htpasswd_users | default([]) }}"
 site_root: /var/www/site
+# / redirects to /<lang>/ by Accept-Language weights, among the language
+# directories of the served release; this one when none of them matches.
+site_default_lang: en
 site_bin_dir: /opt/site/bin
 site_user: site
 # One key per environment of the website repository; a missing file only

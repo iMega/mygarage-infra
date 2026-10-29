@@ -18,6 +18,13 @@ server {
     root {{ site_root }}/production;
     index index.html;
 
+    location = / {
+        rewrite_by_lua_block {
+            require("site_lang").redirect("{{ site_default_lang }}")
+        }
+        try_files $uri $uri/ =404;
+    }
+
     location / {
         try_files $uri $uri/ =404;
     }
@@ -47,6 +54,13 @@ server {
 
     root {{ site_root }}/production;
     index index.html;
+
+    location = / {
+        rewrite_by_lua_block {
+            require("site_lang").redirect("{{ site_default_lang }}")
+        }
+        try_files $uri $uri/ =404;
+    }
 
     location / {
         try_files $uri $uri/ =404;

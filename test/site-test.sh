@@ -90,7 +90,32 @@ page site.test | grep -q 'main branch' || fail "production does not serve the up
 page test.site.test -u "$AUTH" | grep -q 'pull request' || fail "production upload reached test"
 pass "production serves main, test keeps the pull request"
 
-echo "== 5. rollback without rebuild"
+echo "== 5. language by Accept-Language weights"
+# location <accept-language>: where / of the test site redirects.
+location() {
+    curl -fsS -o /dev/null -w '%{redirect_url}' -u "$AUTH" -H 'Host: test.site.test' \
+        ${1:+-H "Accept-Language: $1"} "$PROXY/?utm=x"
+}
+release "$WORK/lang" "root"
+for lang in en ru el; do
+    mkdir -p "$WORK/lang/$lang" && printf '<!doctype html><p>%s</p>\n' "$lang" >"$WORK/lang/$lang/index.html"
+done
+pack "$WORK/lang" | ssh_site test "deploy $(sha 3)" >/dev/null
+[[ $(location '') == */en/?utm=x ]] || fail "no header: $(location '')"
+[[ $(location 'ru-RU,ru;q=0.9,en;q=0.8') == */ru/?utm=x ]] || fail "ru first: $(location 'ru-RU,ru;q=0.9,en;q=0.8')"
+[[ $(location 'en;q=0.5, el;q=0.9') == */el/* ]] || fail "weights ignored: $(location 'en;q=0.5, el;q=0.9')"
+[[ $(location 'de-DE,de;q=0.9,ru;q=0.3') == */ru/* ]] || fail "unserved language not skipped"
+[[ $(location 'de,fr;q=0.8') == */en/* ]] || fail "no match: $(location 'de,fr;q=0.8')"
+[[ $(location 'ru;q=0,*;q=0.5') == */en/* ]] || fail "q=0 not dropped: $(location 'ru;q=0,*;q=0.5')"
+curl -fsS -o /dev/null -D - -u "$AUTH" -H 'Host: test.site.test' "$PROXY/" | grep -qi '^vary: accept-language' ||
+    fail "redirect without Vary"
+curl -fsS -u "$AUTH" -H 'Host: test.site.test' "$PROXY/el/" | grep -q '<p>el' || fail "/el/ not served"
+page test.site.test -u "$AUTH" -H 'Accept-Language: ru' -L | grep -q '<p>ru' || fail "redirect does not reach /ru/"
+page site.test | grep -q 'main branch' || fail "release without languages is redirected"
+pass "weights, unserved languages, q=0 and default en; plain release served as is"
+ssh_site test "rollback" </dev/null >/dev/null
+
+echo "== 6. rollback without rebuild"
 ssh_site production rollback </dev/null >/dev/null 2>&1 && fail "rollback past the first release accepted"
 sleep 1
 release "$WORK/main2" "second main"
@@ -103,7 +128,7 @@ page site.test | grep -q 'second main' || fail "rollback by sha did not restore 
 ssh_site production "rollback $(sha 9)" </dev/null >/dev/null 2>&1 && fail "rollback to an unknown sha accepted"
 pass "rollback to the previous release and by sha"
 
-echo "== 6. bad archives are rejected, the served release stays"
+echo "== 7. bad archives are rejected, the served release stays"
 reject() {
     local what=$1 out
     if out=$(ssh_site test "deploy $(sha c)" 2>&1); then
@@ -126,7 +151,7 @@ in_box "sed -i 's/^MAX_UNPACKED_MB=.*/MAX_UNPACKED_MB=200/' /etc/site-deploy.env
 ssh_site test "deploy ../../etc" </dev/null >/dev/null 2>&1 && fail "path accepted as sha"
 pass "symlink, missing index.html, garbage, oversize and bad sha rejected"
 
-echo "== 7. old releases are pruned"
+echo "== 8. old releases are pruned"
 for c in d e f 1; do
     release "$WORK/pr" "pull request $c"
     pack "$WORK/pr" | ssh_site test "deploy $(sha "$c")" >/dev/null
@@ -138,7 +163,7 @@ in_box 'test -d /var/www/site/releases/seed' || fail "seed release pruned"
 page test.site.test -u "$AUTH" | grep -q 'pull request 1' || fail "test does not serve the newest upload"
 pass "3 test releases kept, seed kept"
 
-echo "== 8. Ansible keeps the served releases"
+echo "== 9. Ansible keeps the served releases"
 ansible_site
 page site.test | grep -q 'second main' || fail "Ansible reset production"
 page test.site.test -u "$AUTH" | grep -q 'pull request 1' || fail "Ansible reset test"

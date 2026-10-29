@@ -31,5 +31,11 @@ http {
     gzip on;
     gzip_types text/css application/javascript application/json text/csv;
 
+    # Loaded by the master, so a broken module fails `openresty -t`.
+    lua_package_path "{{ openresty_conf_dir }}/lua/?.lua;;";
+    init_by_lua_block {
+        require "site_lang"
+    }
+
     include conf.d/*.conf;
 }
